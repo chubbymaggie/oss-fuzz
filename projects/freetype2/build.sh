@@ -17,6 +17,7 @@
 ################################################################################
 
 ./autogen.sh
+sync
 ./configure
 make -j$(nproc) clean
 make -j$(nproc) all
@@ -27,3 +28,6 @@ $CXX $CXXFLAGS -std=c++11 \
   ./objs/*.o -lFuzzingEngine \
   /usr/lib/x86_64-linux-gnu/libarchive.a \
   ./objs/.libs/libfreetype.a
+
+zip -j $OUT/ftfuzzer_seed_corpus.zip $SRC/font-corpus/*
+cp $SRC/*.options $OUT/

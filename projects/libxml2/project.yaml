@@ -1,1 +1,10 @@
 homepage: "http://www.xmlsoft.org/"
+auto_ccs:
+  - "dominicc@chromium.org"
+  - "ddkilzer@apple.com"
+  - "benl@google.com"
+  - "wellnhofer@aevum.de"
+sanitizers:
+  - address
+  - memory
+  - undefined

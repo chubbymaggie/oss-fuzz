@@ -1,1 +1,6 @@
 homepage: "https://github.com/google/woff2"
+primary_contact: "rsheeter@google.com"
+sanitizers:
+  - address
+  - memory
+  - undefined

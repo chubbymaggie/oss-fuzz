@@ -1,10 +1,10 @@
 # Glossary
 
-Naming things is hard, so this page tries to reduce confusion around fuzzing related terminology.
+Naming things is hard, so this page tries to reduce confusion around fuzzing-related terminology.
 
 ## Corpus
 Or **test corpus**, or **fuzzing corpus**.<BR>
-A set of [test inputs](#test-input). In most contexts, it is also referred to a set of minimal test inputs that generate maximal code coverage.
+A set of [test inputs](#test-input). In most contexts, it refers to a set of minimal test inputs that generate maximal code coverage.
 
 ## Fuzz Target
 Or **Target Function**, or **Fuzzing Target Function**, or **Fuzzing Entry Point**.<BR>
@@ -28,7 +28,7 @@ a [fuzzer build](#job-type).
 ## Fuzzing Engine
 
 A tool that tries to find interesting inputs for a [fuzz target](#fuzz-target) by executing it.
-Examples: [libFuzzer](http://lbfuzzer.info),
+Examples: [libFuzzer](http://libfuzzer.info),
 [AFL](lcamtuf.coredump.cx/afl/),
 [honggfuzz](https://github.com/google/honggfuzz), etc 
 
@@ -37,13 +37,13 @@ See related terms [Mutation Engine](#mutation-engine) and [Test Generator](#test
 ## Job type
 
 Or **Fuzzer Build**.<BR>
-A [ClusterFuzz](clusterfuzz.md) specific term.
+A [ClusterFuzz](clusterfuzz.md)-specific term.
 This refers to a build that contains all the [fuzz targets](#fuzz-target) for a given [project](#project), is run 
 with a specific [fuzzing engine](#fuzzing-engine), in a specific build mode (e.g. with enabled/disabled assertions), 
 and optionally combined with a [sanitizer](#sanitizer).
 
 For example, we have a "libfuzzer_asan_sqlite" job type, indicating a build of all sqlite3 [fuzz targets](#fuzz-target) using 
-[libFuzzer](http://lbfuzzer.info) and [ASan](http://clang.llvm.org/docs/AddressSanitizer.html).
+[libFuzzer](http://libfuzzer.info) and [ASan](http://clang.llvm.org/docs/AddressSanitizer.html).
 
 
 ## Mutation Engine
@@ -53,7 +53,7 @@ Example: [radamsa](https://github.com/aoh/radamsa) (a generic test mutator).
 
 ## Project
 
-A project is an open source software that is integrated with OSS-Fuzz. 
+A project is an open source software project that is integrated with OSS-Fuzz.
 Each project has a single set of configuration files 
 (example: [expat](https://github.com/google/oss-fuzz/tree/master/projects/expat)) and 
 may have one or more [fuzz targets](#fuzz-target) 
@@ -81,4 +81,4 @@ Examples:
 
 ## Test Input
 A sequence of bytes that is used as input to a [fuzz target](#fuzz-target). 
-Typicaly, a test input is stored in a separate file. 
+Typically, a test input is stored in a separate file.

@@ -1,4 +1,4 @@
-# Setting up New Project
+# Setting up a New Project
 
 ## Prerequisites
 - [Integrate](ideal_integration.md) one or more [Fuzz Targets](glossary.md#fuzz-target)
@@ -12,7 +12,7 @@
 [re2](https://github.com/google/re2/tree/master/re2/fuzzing),
 [harfbuzz](https://github.com/behdad/harfbuzz/tree/master/test/fuzzing),
 [pcre2](http://vcs.pcre.org/pcre2/code/trunk/src/pcre2_fuzzsupport.c?view=markup),
-[ffmpeg](https://github.com/FFmpeg/FFmpeg/blob/master/doc/examples/decoder_targeted.c).
+[ffmpeg](https://github.com/FFmpeg/FFmpeg/blob/master/tools/target_dec_fuzzer.c).
 
 - [Install Docker](installing_docker.md). ([Why Docker?](faq.md#why-do-you-use-docker))
 
@@ -26,11 +26,11 @@ Example: [boringssl](https://github.com/google/boringssl) project is located in
 
 The project directory needs to contain the following three configuration files:
 
+* `projects/<project_name>/project.yaml` - provides metadata about the project.
 * `projects/<project_name>/Dockerfile` - defines the container environment with information
 on dependencies needed to build the project and its [fuzz targets](glossary.md#fuzz-target).
 * `projects/<project_name>/build.sh` - build script that executes inside the container and
 generates project build.
-* `projects/<project_name>/project.yaml` - provides metadata about the project.
 
 To *automatically* create a new directory for your project and
 generate templated versions of these configuration files,
@@ -44,24 +44,38 @@ $ python infra/helper.py generate $PROJECT_NAME
 
 It is preferred to keep and maintain [fuzz targets](glossary.md#fuzz-target) in your own source code repository. If this is not possible due to various reasons, you can store them inside the OSS-Fuzz's project directory created above.
 
+## project.yaml
+
+This file stores the metadata about your project. The following attributes are supported:
+
+* `homepage` - Project's homepage.
+* `primary_contact`, `auto_ccs` - Primary contact and CCs list. These people get access to ClusterFuzz 
+which includes crash reports, fuzzer statistics, etc and are auto-cced on newly filed bugs in OSS-Fuzz
+tracker.
+* `sanitizers` (optional) - List of sanitizers to use. By default, you shouldn't override this and it 
+will use the default list of supported sanitizers (currently -
+AddressSanitizer("address"), UndefinedBehaviorSanitizer("undefined")). 
+If your project does not build with a particular sanitizer configuration and you need some time fixing
+it, then you can use this option to override the defaults temporarily. E.g. For disabling 
+UndefinedBehaviourSanitizer build, then you can just specify all supported sanitizers, except "undefined".
+
+Example: [boringssl](https://github.com/google/oss-fuzz/blob/master/projects/boringssl/project.yaml).
+
 ## Dockerfile
 
 This file defines the Docker image definition. This is where the build.sh script will be executed in.
 It is very simple for most projects:
 ```docker
-FROM ossfuzz/base-libfuzzer               # base image with clang toolchain
+FROM gcr.io/oss-fuzz-base/base-builder    # base image with clang toolchain
 MAINTAINER YOUR_EMAIL                     # maintainer for this file
-RUN apt-get install -y ...                # install required packages to build your project
+RUN apt-get update && apt-get install -y ... # install required packages to build your project
 RUN git clone <git_url> <checkout_dir>    # checkout all sources needed to build your project
 WORKDIR <checkout_dir>                    # current directory for build script
 COPY build.sh fuzzer.cc $SRC/             # copy build script and other fuzzer files in src dir
 ```
 Expat example: [expat/Dockerfile](../projects/expat/Dockerfile)
 
-### Fuzzer execution environment
-
-[This page](fuzzer_environment.md) gives information about the environment that
-your [fuzz targets](glossary.md#fuzz-target) will run on ClusterFuzz, and the assumptions that you can make.
+In the above example, the git clone will check out the source to `$SRC/<checkout_dir>`. 
 
 ## build.sh
 
@@ -77,10 +91,10 @@ In general, this script will need to:
 
 *Note*:
 
-1. Please don't assume that the fuzzing engine is libFuzzer and hardcode in your build scripts. 
-In future, we will add support for other fuzzing engines like AFL. 
+1. Please don't assume that the fuzzing engine is libFuzzer and hardcode in your build scripts.
+In future, we will add support for other fuzzing engines like AFL.
 So, link the fuzzing engine using `-lFuzzingEngine`, see example below.
-2. Please make sure that the binary names for your [fuzz targets](glossary.md#fuzz-target) contain only 
+2. Please make sure that the binary names for your [fuzz targets](glossary.md#fuzz-target) contain only
 alphanumeric characters, underscore(_) or dash(-). Otherwise, they won't run on our infrastructure.
 
 For expat, this looks like [this](https://github.com/google/oss-fuzz/blob/master/projects/expat/build.sh):
@@ -127,9 +141,19 @@ These flags are provided in the following environment variables:
 Most well-crafted build scripts will automatically use these variables. If not,
 pass them manually to the build tool.
 
-See [Provided Environment Variables](../infra/base-images/base-libfuzzer/README.md#provided-environment-variables) section in
-`base-libfuzzer` image documentation for more details.
+See [Provided Environment Variables](../infra/base-images/base-builder/README.md#provided-environment-variables) section in
+`base-builder` image documentation for more details.
 
+## Disk space restrictions
+
+Our builders have a disk size of 70GB (this includes space taken up by the OS). Builds must keep peak disk usage below this.
+
+In addition to this, please keep the size of the build (everything copied to `$OUT`) small (<10GB uncompressed) -- this will need be repeatedly transferred and unzipped during fuzzing and run on VMs with limited disk space.
+
+## Fuzzer execution environment
+
+[This page](fuzzer_environment.md) gives information about the environment that
+your [fuzz targets](glossary.md#fuzz-target) will run on ClusterFuzz, and the assumptions that you can make.
 
 ## Testing locally
 
@@ -138,19 +162,21 @@ Use the helper script to build docker image and [fuzz targets](glossary.md#fuzz-
 ```bash
 $ cd /path/to/oss-fuzz
 $ python infra/helper.py build_image $PROJECT_NAME
-$ python infra/helper.py build_fuzzers $PROJECT_NAME
+$ python infra/helper.py build_fuzzers --sanitizer <address/memory/undefined> $PROJECT_NAME
 ```
 
 This should place the built binaries into `/path/to/oss-fuzz/build/out/$PROJECT_NAME`
-directory on your machine (and `$OUT` in the container). You should then try to run these binaries
-inside the container to make sure that they work properly:
+directory on your machine (and `$OUT` in the container).
+
+*Note*: You *must* run these fuzz target binaries inside the base-runner docker
+container to make sure that they work properly:
 
 ```bash
 $ python infra/helper.py run_fuzzer $PROJECT_NAME <fuzz_target>
 ```
 
-If everything works locally, then it should also work on our automated builders
-and ClusterFuzz.
+If everything works locally, then it should also work on our automated builders and ClusterFuzz.
+If it fails, check out [this](fuzzer_environment.md#dependencies) entry.
 
 It's recommended to look at code coverage as a sanity check to make sure that
 [fuzz target](glossary.md#fuzz-target) gets to the code you expect.
@@ -159,6 +185,9 @@ It's recommended to look at code coverage as a sanity check to make sure that
 $ python infra/helper.py coverage $PROJECT_NAME <fuzz_target>
 ```
 
+*Note*: Currently, we only support AddressSanitizer (address) and UndefinedBehaviorSanitizer (undefined) 
+configurations. MemorySanitizer is in development mode and not recommended for use. <b>Make sure to test each
+of the supported build configurations with the above commands (build_fuzzers -> run_fuzzer -> coverage).</b>
 
 ## Debugging Problems
 
@@ -167,7 +196,7 @@ $ python infra/helper.py coverage $PROJECT_NAME <fuzz_target>
 in case you run into problems.
 
 
-### Custom libFuzzer options for ClusterFuzz
+## Custom libFuzzer options for ClusterFuzz
 
 By default, ClusterFuzz will run your fuzzer without any options. You can specify
 custom options by creating a `my_fuzzer.options` file next to a `my_fuzzer` executable in `$OUT`:
@@ -203,10 +232,12 @@ has an appropriate and consistent license.
 
 ### Dictionaries
 
-Dictionaries hugely improve fuzzing effeciency for inputs with lots of similar
+Dictionaries hugely improve fuzzing efficiency for inputs with lots of similar
 sequences of bytes. [libFuzzer documentation](http://libfuzzer.info#dictionaries)
 
-Put your dict file in `$OUT` and specify in .options file:
+Put your dict file in `$OUT`. If the dict filename is the same as your target
+binary name (i.e. `%fuzz_target%.dict`), it will be automatically used. If the name is different
+(e.g. because it is shared by several targets), specify this in .options file:
 
 ```
 [libfuzzer]
@@ -216,12 +247,6 @@ dict = dictionary_name.dict
 It is common for several [fuzz targets](glossary.md#fuzz-target)
 to reuse the same dictionary if they are fuzzing very similar inputs.
 (example: [expat](https://github.com/google/oss-fuzz/blob/master/projects/expat/parse_fuzzer.options)).
-
-## project.yaml
-
-This file stores the metadata about your project. This includes things like project's homepage,
-list of sanitizers used, list of ccs on newly filed bugs, etc.
-(example: [expat](https://github.com/google/oss-fuzz/blob/master/projects/expat/project.yaml)).
 
 ## Checking in to OSS-Fuzz repository
 
@@ -258,4 +283,9 @@ If you are porting a fuzz target from Chromium, keep the original Chromium licen
 Once your change is merged, your project and fuzz targets should be automatically built and run on
 ClusterFuzz after a short while (&lt; 1 day)!<BR><BR>
 Check your project's build status [here](https://oss-fuzz-build-logs.storage.googleapis.com/status.html).<BR>
-Check out the crashes generated and code coverage statistics on [ClusterFuzz](clusterfuzz.md) web interface [here](https://clusterfuzz-external.appspot.com/).
+
+Use [ClusterFuzz](clusterfuzz.md) web interface [here](https://oss-fuzz.com/) to checkout the following items:
+* Crashes generated
+* Code coverage statistics
+* Fuzzer statistics
+* Fuzzer performance analyzer (linked from fuzzer statistics)

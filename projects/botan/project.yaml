@@ -3,3 +3,10 @@ primary_contact: "jack.lloyd@gmail.com"
 auto_ccs:
   - "r.korthaus@sirrix.com"
   - "d.neus@sirrix.com"
+sanitizers:
+  - address
+  - memory
+  - undefined
+fuzzing_engines:
+  - libfuzzer
+  - afl

@@ -1,6 +1,6 @@
 # OSS-Fuzz - Continuous Fuzzing for Open Source Software
 
-> *Status*: Beta. We are now accepting applications from widely used open source projects.
+> *Status*: Beta. We are now accepting applications from widely-used open source projects.
 
 [FAQ](docs/faq.md)
 | [Ideal Fuzzing Integration](docs/ideal_integration.md)
@@ -32,11 +32,13 @@ At the first stage of the project we use
 [libFuzzer](http://llvm.org/docs/LibFuzzer.html) with
 [Sanitizers](https://github.com/google/sanitizers). More fuzzing engines will be added later.
 [ClusterFuzz](docs/clusterfuzz.md)
-provides distributed fuzzer execution environment and reporting.
+provides a distributed fuzzer execution environment and reporting.
 
 Currently OSS-Fuzz supports C and C++ code (other languages supported by [LLVM](http://llvm.org) may work too).
 
 ## Process Overview
+
+![diagram](docs/images/process.png?raw=true)
 
 The following process is used for projects in OSS-Fuzz:
 
@@ -47,11 +49,12 @@ and [integrates](docs/ideal_integration.md) them with the project's build and te
 - When [ClusterFuzz](docs/clusterfuzz.md) finds a bug, an issue is automatically
   reported in the OSS-Fuzz [issue tracker](https://bugs.chromium.org/p/oss-fuzz/issues/list) 
   ([example](https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=9)).
-  ([Why different tracker?](docs/faq.md#why-do-you-use-a-different-issue-tracker-for-reporting-bugs-in-oss-projects)).
+  ([Why use a different tracker?](docs/faq.md#why-do-you-use-a-different-issue-tracker-for-reporting-bugs-in-oss-projects)).
   Project owners are CC-ed to the bug report.
-- The bug is fixed upstream.
+- The project developer fixes the bug upstream and credits OSS-Fuzz for the discovery (commit message should contain
+  the string **'Credit to OSS-Fuzz'**).
 - [ClusterFuzz](docs/clusterfuzz.md) automatically verifies the fix, adds a comment and closes the issue ([example](https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=53#c3)).
-- 7 days after the fix is verified or 90 days after reporting, the issue becomes *public*
+- 30 days after the fix is verified or 90 days after reporting (whichever is earlier), the issue becomes *public*
   ([guidelines](#bug-disclosure-guidelines)).
 
 <!-- NOTE: this anchor is referenced by oss-fuzz blog post -->
@@ -66,22 +69,23 @@ To submit a new project:
   * e-mail of the engineering contact person to be CCed on new issues. This
     email should be  
     [linked to a Google Account](https://support.google.com/accounts/answer/176347?hl=en)
-    ([why?](docs/faq.md#why-we-require-an-e-mail-associated-with-a-google-account))
+    ([why?](docs/faq.md#why-do-you-require-an-e-mail-associated-with-a-google-account))
     and belong to an established project committer (according to VCS logs).
     If this is not you or the email address differs from VCS, an informal e-mail verification will be required.
   * Note that `project_name` can only contain alphanumeric characters, underscores(_) or dashes(-).
 - Once accepted by an OSS-Fuzz project member, follow the [New Project Guide](docs/new_project_guide.md)
-  to write the code.
+  to configure your project.
 
 
 ## Bug Disclosure Guidelines
 
 Following [Google's standard disclosure policy](https://googleprojectzero.blogspot.com/2015/02/feedback-and-data-driven-updates-to.html)
 OSS-Fuzz will adhere to following disclosure principles:
-  - **90-day deadline**. After notifying project authors, we will open reported
-    issues in 90 days, or 7 days after the fix is released.
-  - **Weekends and holidays**. If a deadline is due to expire on a weekend or
-    US public holiday, the deadline will be moved to the next normal work day.
+  - **Deadline**. After notifying project authors, we will open reported
+    issues to the public in 90 days, or 30 days after the fix is released 
+    (whichever comes earlier).
+  - **Weekends and holidays**. If a deadline is due to expire on a weekend,
+    the deadline will be moved to the next normal work day.
   - **Grace period**. We have a 14-day grace period. If a 90-day deadline
     expires but the upstream engineers let us know before the deadline that a
     patch is scheduled for release on a specific day within 14 days following
@@ -96,25 +100,30 @@ OSS-Fuzz will adhere to following disclosure principles:
 * [Accessing corpora](docs/corpora.md) describes how to access the corpora we use for fuzzing.
 * [Fuzzer execution environment](docs/fuzzer_environment.md) documents the
   environment under which your fuzzers will be run.
-* [Projects](projects) lists OSS projects currently added to OSS-Fuzz.
+* [Projects](projects) lists OSS projects currently analyzed by OSS-Fuzz.
 * [Chrome's Efficient Fuzzer Guide](https://chromium.googlesource.com/chromium/src/testing/libfuzzer/+/HEAD/efficient_fuzzer.md) 
-  while contains some chrome-specifics, is an excellent documentation on making your fuzzer better.
-* Blog posts: 2016-12-01 ([1](https://opensource.googleblog.com/2016/12/announcing-oss-fuzz-continuous-fuzzing.html),
+  while containing some Chrome-specific bits, is an excellent guide to making your fuzzer better.
+* Blog posts: 
+  * 2016-12-01 ([1](https://opensource.googleblog.com/2016/12/announcing-oss-fuzz-continuous-fuzzing.html),
 [2](https://testing.googleblog.com/2016/12/announcing-oss-fuzz-continuous-fuzzing.html),
 [3](https://security.googleblog.com/2016/12/announcing-oss-fuzz-continuous-fuzzing.html))
+  * 2017-05-08 ([1](https://opensource.googleblog.com/2017/05/oss-fuzz-five-months-later-and.html),
+[2](https://testing.googleblog.com/2017/05/oss-fuzz-five-months-later-and.html),
+[3](https://security.googleblog.com/2017/05/oss-fuzz-five-months-later-and.html))
 
 ## Build Status
-[This page](https://oss-fuzz-build-logs.storage.googleapis.com/status.html)
+[This page](https://oss-fuzz-build-logs.storage.googleapis.com/index.html)
 gives the latest build logs for each project.
 
 ## Trophies
 
 [This page](https://bugs.chromium.org/p/oss-fuzz/issues/list?can=1&q=status%3AFixed%2CVerified+Type%3ABug%2CBug-Security+-component%3AInfra+)
-gives a list of publically viewable fixed bugs found by OSS-Fuzz.
+gives a list of publicly-viewable fixed bugs found by OSS-Fuzz.
 
 ## References
 * [libFuzzer documentation](http://libfuzzer.info)
 * [libFuzzer tutorial](http://tutorial.libfuzzer.info)
+* [libFuzzer workshop](https://github.com/Dor1s/libfuzzer-workshop)
 * [Chromium Fuzzing Page](https://chromium.googlesource.com/chromium/src/testing/libfuzzer/)
 * [ClusterFuzz](https://blog.chromium.org/2012/04/fuzzing-for-security.html)
 
