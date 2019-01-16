@@ -1,14 +1,14 @@
 # Fuzzer environment on ClusterFuzz
 
-Your fuzz targets will be run on a [Google Compute Engine](https://cloud.google.com/compute/) VM (Linux) with some security restrictions.
+Your fuzz targets will be run on a [Google Compute Engine](https://cloud.google.com/compute/) VM (Linux) with some [security restrictions](https://github.com/google/oss-fuzz/blob/master/infra/base-images/base-runner/run_minijail).
 
 ## Runtime Dependencies
 
 You should not make any assumptions on the availability of dependent packages 
 in the execution environment. Packages that are installed via
-[Dockerfile](https://github.com/google/oss-fuzz/blob/master/docs/new_project_guide.md#dockerfile)
+[Dockerfile](new_project_guide.md#dockerfile)
 or built as part of 
-[build.sh](https://github.com/google/oss-fuzz/blob/master/docs/new_project_guide.md#buildsh)
+[build.sh](new_project_guide.md#buildsh)
 are not available on the bot runtime environment (where the fuzz targets run).
 
 If you need these dependencies in the runtime environment, you can either
@@ -17,7 +17,7 @@ If you need these dependencies in the runtime environment, you can either
 and then link statically against them
 ([example](https://github.com/google/oss-fuzz/blob/master/projects/tor/build.sh#L40))
 - Or build the dependencies statically in
-[build.sh](https://github.com/google/oss-fuzz/blob/master/docs/new_project_guide.md#buildsh)
+[build.sh](new_project_guide.md#buildsh)
 ([example](https://github.com/google/oss-fuzz/blob/master/projects/ffmpeg/build.sh#L26)).
 
 All build artifacts needed during fuzz target execution should be inside the `$OUT`
@@ -32,7 +32,7 @@ created during build-time.
 
 ## argv[0]
 
-You must not modify argv[0]. It is required for certain things to work correctly.
+You must not modify `argv[0]`. It is required for certain things to work correctly.
 
 ## Current working directory
 
@@ -52,7 +52,3 @@ executable lives in.
 Your project should not be compiled with `-march=native` or `-mtune=native`
 flags, as the build infrastructure and fuzzing machines may have different CPUs
 as well as other hardware differences. You may however use `-mtune=generic`.
-
-## Network access
-
-There will be no network interfaces available (not even loopback).

@@ -31,7 +31,9 @@ CFLAGS="" CXXFLAGS="" ./configure --prefix="$FFMPEG_DEPS_PATH"
 make clean
 make -j$(nproc)
 make install
-export PATH=$FFMPEG_DEPS_PATH/bin:$PATH
+
+export PATH="$FFMPEG_DEPS_PATH/bin:$PATH"
+export LD_LIBRARY_PATH="$FFMPEG_DEPS_PATH/lib"
 
 cd $SRC
 bzip2 -f -d alsa-lib-*
@@ -52,6 +54,7 @@ make install
 
 cd $SRC/fdk-aac
 autoreconf -fiv
+CXXFLAGS="$CXXFLAGS -fno-sanitize=shift-base" \
 ./configure --prefix="$FFMPEG_DEPS_PATH" --disable-shared
 make clean
 make -j$(nproc) all
@@ -95,14 +98,16 @@ make install
 
 cd $SRC/libvpx
 LDFLAGS="$CXXFLAGS" ./configure --prefix="$FFMPEG_DEPS_PATH" \
-    --disable-examples --disable-unit-tests
+    --disable-examples --disable-unit-tests \
+    --size-limit=12288x12288 \
+    --extra-cflags="-DVPX_MAX_ALLOCABLE_MEMORY=1073741824"
 make clean
 make -j$(nproc) all
 make install
 
 cd $SRC/ogg
 ./autogen.sh
-./configure --prefix="$FFMPEG_DEPS_PATH" --enable-static
+./configure --prefix="$FFMPEG_DEPS_PATH" --enable-static --disable-crc
 make clean
 make -j$(nproc)
 make install
@@ -119,7 +124,9 @@ cd $SRC/theora
 CFLAGS="$CFLAGS -fPIC" LDFLAGS="-L$FFMPEG_DEPS_PATH/lib/" \
     CPPFLAGS="$CXXFLAGS -I$FFMPEG_DEPS_PATH/include/" \
     LD_LIBRARY_PATH="$FFMPEG_DEPS_PATH/lib/" \
-    ./autogen.sh --prefix="$FFMPEG_DEPS_PATH" --enable-static --disable-examples
+    ./autogen.sh
+./configure --with-ogg="$FFMPEG_DEPS_PATH" --prefix="$FFMPEG_DEPS_PATH" \
+    --enable-static --disable-examples
 make clean
 make -j$(nproc)
 make install
@@ -160,6 +167,7 @@ PKG_CONFIG_PATH="$FFMPEG_DEPS_PATH/lib/pkgconfig" ./configure \
     --extra-ldflags="-L$FFMPEG_DEPS_PATH/lib" \
     --prefix="$FFMPEG_DEPS_PATH" \
     --pkg-config-flags="--static" \
+    --enable-ossfuzz \
     --libfuzzer=-lFuzzingEngine \
     --optflags=-O1 \
     --enable-gpl \
@@ -198,7 +206,7 @@ export TEMP_VAR_CODEC_TYPE="VIDEO"
 CONDITIONALS=`grep 'DECODER 1$' config.h | sed 's/#define CONFIG_\(.*\)_DECODER 1/\1/'`
 for c in $CONDITIONALS ; do
   fuzzer_name=ffmpeg_AV_CODEC_ID_${c}_fuzzer
-  symbol=`git grep 'REGISTER_[A-Z]*DEC[A-Z ]*('"$c"' *,' libavcodec/allcodecs.c | sed 's/.*, *\([^) ]*\)).*/\1/'`
+  symbol=`echo $c | sed "s/.*/\L\0/"`
   echo -en "[libfuzzer]\nmax_len = 1000000\n" > $OUT/${fuzzer_name}.options
   make tools/target_dec_${symbol}_fuzzer
   mv tools/target_dec_${symbol}_fuzzer $OUT/${fuzzer_name}

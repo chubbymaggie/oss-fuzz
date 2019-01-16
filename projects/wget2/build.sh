@@ -19,6 +19,8 @@ export WGET2_DEPS_PATH=$SRC/wget2_deps
 export PKG_CONFIG_PATH=$WGET2_DEPS_PATH/lib/pkgconfig
 export CPPFLAGS="-I$WGET2_DEPS_PATH/include"
 export LDFLAGS="-L$WGET2_DEPS_PATH/lib"
+export GNULIB_SRCDIR=$SRC/gnulib
+export LLVM_PROFILE_FILE=/tmp/prof.test
 
 cd $SRC/libunistring
 ./autogen.sh
@@ -58,11 +60,20 @@ if test $? != 0;then
 fi
 
 cd $SRC/gnutls
-make bootstrap
+touch .submodule.stamp
+./bootstrap
+GNUTLS_CFLAGS=`echo $CFLAGS|sed s/-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION//`
 LIBS="-lunistring" \
+CFLAGS="$GNUTLS_CFLAGS" \
 ./configure --with-nettle-mini --enable-gcc-warnings --enable-static --disable-shared --with-included-libtasn1 \
     --with-included-unistring --without-p11-kit --disable-doc --disable-tests --disable-tools --disable-cxx \
     --disable-maintainer-mode --disable-libdane --disable-gcc-warnings --prefix=$WGET2_DEPS_PATH $GNUTLS_CONFIGURE_FLAGS
+make -j$(nproc)
+make install
+
+cd $SRC/libmicrohttpd-*
+LIBS="-lgnutls -lhogweed -lnettle -lidn2 -lunistring" \
+./configure --prefix=$WGET2_DEPS_PATH --disable-doc --disable-examples --disable-shared --enable-static
 make -j$(nproc)
 make install
 
@@ -72,24 +83,33 @@ export ASAN_OPTIONS=detect_leaks=0
 
 cd $SRC/wget2
 ./bootstrap
-LIBS="-lgnutls -lnettle -lhogweed -lidn2 -lunistring" \
-./configure --enable-static --disable-shared --disable-doc --without-plugin-support
-make clean
-make -j$(nproc) all check
 
+# build and run non-networking tests
+LIBS="-lgnutls -lhogweed -lnettle -lidn2 -lunistring" \
+  ./configure -C --enable-static --disable-shared --disable-doc --without-plugin-support
+make clean
+make -j$(nproc)
+make -j$(nproc) -C unit-tests check
+make -j$(nproc) -C fuzz check
+
+# build for fuzzing
+LIBS="-lgnutls -lhogweed -lnettle -lidn2 -lunistring" \
+  ./configure -C --enable-fuzzing --enable-static --disable-shared --disable-doc --without-plugin-support
+make clean
+make -j$(nproc) -C lib
+make -j$(nproc) -C include
+make -j$(nproc) -C libwget
+make -j$(nproc) -C src
+
+# build fuzzers
 cd fuzz
 CXXFLAGS="$CXXFLAGS -L$WGET2_DEPS_PATH/lib/" make oss-fuzz
+
+find . -name '*_fuzzer' -exec cp -v '{}' $OUT ';'
 find . -name '*_fuzzer.dict' -exec cp -v '{}' $OUT ';'
 find . -name '*_fuzzer.options' -exec cp -v '{}' $OUT ';'
 
-for fuzzer in *_fuzzer; do
-    cp -p "${fuzzer}" "$OUT"
-
-    if [ -f "$SRC/${fuzzer}_seed_corpus.zip" ]; then
-        cp "$SRC/${fuzzer}_seed_corpus.zip" "$OUT/"
-    fi
-
-    if [ -d "${fuzzer}.in/" ]; then
-        zip -rj "$OUT/${fuzzer}_seed_corpus.zip" "${fuzzer}.in/"
-    fi
+for dir in *_fuzzer.in; do
+  fuzzer=$(basename $dir .in)
+  zip -rj "$OUT/${fuzzer}_seed_corpus.zip" "${dir}/"
 done

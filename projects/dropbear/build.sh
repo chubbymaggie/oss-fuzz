@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2016 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,3 +34,4 @@ make -C $SRC/dropbear/corpus
 cp -v $TARGETS $OUT/
 cp -v *.options $OUT/
 cp -v $SRC/dropbear/corpus/*.zip $OUT/
+cp -v $SRC/dropbear/corpus/*.dict $OUT/

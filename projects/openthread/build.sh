@@ -20,26 +20,45 @@
 ./configure                             \
     --enable-fuzz-targets               \
     --enable-application-coap           \
+    --enable-application-coap-secure    \
+    --enable-border-agent               \
     --enable-border-router              \
     --enable-cert-log                   \
+    --enable-channel-manager            \
+    --enable-channel-monitor            \
     --enable-child-supervision          \
     --enable-commissioner               \
     --enable-dhcp6-client               \
     --enable-dhcp6-server               \
+    --enable-dns-client                 \
     --enable-diag                       \
     --enable-dns-client                 \
+    --enable-ecdsa                      \
+    --enable-ftd                        \
     --enable-jam-detection              \
     --enable-joiner                     \
     --enable-legacy                     \
-    --enable-mac-whitelist              \
+    --enable-mac-filter                 \
     --enable-mtd-network-diagnostic     \
+    --enable-ncp                        \
+    --with-ncp-bus=uart                 \
     --enable-raw-link-api               \
-    --enable-tmf-proxy                  \
+    --enable-service                    \
+    --enable-sntp-client                \
+    --enable-udp-forward                \
     --disable-docs
 
 make -j$(nproc)
 
 find . -name '*-fuzzer' -exec cp -v '{}' $OUT ';'
-find . -name '*_fuzzer.dict' -exec cp -v '{}' $OUT ';'
+find . -name '*-fuzzer.dict' -exec cp -v '{}' $OUT ';'
 find . -name '*-fuzzer.options' -exec cp -v '{}' $OUT ';'
-find . -name '*_fuzzer_seed_corpus.zip' -exec cp -v '{}' $OUT ';'
+
+fuzzers=$(find tests/fuzz -name "*-fuzzer")
+for f in $fuzzers; do
+    fuzzer=$(basename $f -fuzzer)
+
+    if [ -d "tests/fuzz/corpora/${fuzzer}" ]; then
+	zip -j $OUT/$(basename $f)_seed_corpus.zip tests/fuzz/corpora/${fuzzer}/*
+    fi
+done

@@ -48,19 +48,69 @@ It is preferred to keep and maintain [fuzz targets](glossary.md#fuzz-target) in 
 
 This file stores the metadata about your project. The following attributes are supported:
 
-* `homepage` - Project's homepage.
-* `primary_contact`, `auto_ccs` - Primary contact and CCs list. These people get access to ClusterFuzz 
+### homepage
+Project's homepage.
+
+### primary_contact, auto_ccs
+Primary contact and CCs list. These people get access to ClusterFuzz 
 which includes crash reports, fuzzer statistics, etc and are auto-cced on newly filed bugs in OSS-Fuzz
 tracker.
-* `sanitizers` (optional) - List of sanitizers to use. By default, you shouldn't override this and it 
-will use the default list of supported sanitizers (currently -
-AddressSanitizer("address"), UndefinedBehaviorSanitizer("undefined")). 
+
+### sanitizers (optional)
+List of sanitizers to use. By default, it will use the default list of supported
+sanitizers (currently -
+["address"](https://clang.llvm.org/docs/AddressSanitizer.html),
+["undefined"](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html)).
+
 If your project does not build with a particular sanitizer configuration and you need some time fixing
 it, then you can use this option to override the defaults temporarily. E.g. For disabling 
 UndefinedBehaviourSanitizer build, then you can just specify all supported sanitizers, except "undefined".
 
+[MemorySanitizer ("memory")](https://clang.llvm.org/docs/MemorySanitizer.html) is also supported, but is not enabled by default due to likelihood of false positives.
+For this to work, ensure that your project's runtime dependencies are listed in
+[this file](https://github.com/google/oss-fuzz/blob/master/infra/base-images/msan-builder/Dockerfile#L20).
+You may opt-in by adding "memory" to this list.
+
+If you want to test a particular sanitizer (e.g. memory) and see what crashes it generates without filing
+them in the issue tracker, you can set the experimental flag. The crashes can be accessed on [ClusterFuzz
+homepage](clusterfuzz.md#web-interface). Example:
+
+```
+sanitizers:
+ - address
+ - memory:
+    experimental: True
+ - undefined
+ ```
+
 Example: [boringssl](https://github.com/google/oss-fuzz/blob/master/projects/boringssl/project.yaml).
 
+### help_url
+Link to a custom help URL in bug reports instead of the
+[default OSS-Fuzz guide to reproducing crashes](reproducing.md). This can be useful if you assign
+bugs to members of your project unfamiliar with OSS-Fuzz or if they should follow a different workflow for
+reproducing and fixing bugs than standard one outlined in the reproducing guide.
+
+Example: [skia](https://github.com/google/oss-fuzz/blob/master/projects/skia/project.yaml).
+
+### experimental
+A boolean (either True or False) that indicates whether this project is in evaluation mode. This allows a project to be
+fuzzed and generate crash findings, but not file them in the issue tracker. The crashes can be accessed on [ClusterFuzz homepage](clusterfuzz.md#web-interface). This should be only used if you are not a maintainer of the project and have
+less confidence in the efficacy of your fuzz targets. Example:
+
+```
+homepage: "{project_homepage}"
+primary_contact: "{primary_contact}"
+auto_ccs:
+  - "{auto_cc_1}"
+  - "{auto_cc_2}"
+sanitizers:
+  - address
+  - memory
+  - undefined
+help_url: "{help_url}"  
+experimental: True
+```
 ## Dockerfile
 
 This file defines the Docker image definition. This is where the build.sh script will be executed in.
@@ -92,7 +142,7 @@ In general, this script will need to:
 *Note*:
 
 1. Please don't assume that the fuzzing engine is libFuzzer and hardcode in your build scripts.
-In future, we will add support for other fuzzing engines like AFL.
+We generate builds for both libFuzzer and AFL fuzzing engine configurations.
 So, link the fuzzing engine using `-lFuzzingEngine`, see example below.
 2. Please make sure that the binary names for your [fuzz targets](glossary.md#fuzz-target) contain only
 alphanumeric characters, underscore(_) or dash(-). Otherwise, they won't run on our infrastructure.
@@ -130,6 +180,8 @@ When build.sh script is executed, the following locations are available within t
 While files layout is fixed within a container, the environment variables are
 provided to be able to write retargetable scripts.
 
+### Requirements
+
 You *must* use the special compiler flags needed to build your project and fuzz targets.
 These flags are provided in the following environment variables:
 
@@ -137,6 +189,8 @@ These flags are provided in the following environment variables:
 | -------------          | --------
 | `$CC`, `$CXX`, `$CCC`  | The C and C++ compiler binaries.
 | `$CFLAGS`, `$CXXFLAGS` | C and C++ compiler flags.
+
+You *must* use `$CXX` as a linker, even if your project is written in pure C.
 
 Most well-crafted build scripts will automatically use these variables. If not,
 pass them manually to the build tool.
@@ -172,6 +226,13 @@ directory on your machine (and `$OUT` in the container).
 container to make sure that they work properly:
 
 ```bash
+$ python infra/helper.py check_build $PROJECT_NAME
+```
+
+Please fix any failures pointed by the `check_build` command above. To test changes against
+a particular fuzz target, run using:
+
+```bash
 $ python infra/helper.py run_fuzzer $PROJECT_NAME <fuzz_target>
 ```
 
@@ -182,6 +243,7 @@ It's recommended to look at code coverage as a sanity check to make sure that
 [fuzz target](glossary.md#fuzz-target) gets to the code you expect.
 
 ```bash
+$ python infra/helper.py build_fuzzers --sanitizer coverage $PROJECT_NAME
 $ python infra/helper.py coverage $PROJECT_NAME <fuzz_target>
 ```
 
@@ -203,10 +265,18 @@ custom options by creating a `my_fuzzer.options` file next to a `my_fuzzer` exec
 
 ```
 [libfuzzer]
-max_len = 1024
+close_fd_mask = 3
+only_ascii = 1
 ```
 
-[List of available options](http://llvm.org/docs/LibFuzzer.html#options). Use of `max_len` is highly recommended.
+[List of available options](http://llvm.org/docs/LibFuzzer.html#options). Use of `max_len` is not recommended as other fuzzing engines may not support that option. Instead, if
+you need to strictly enforce the input length limit, add a sanity check to the
+beginning of your fuzz target:
+
+```cpp
+if (size < kMinInputLength || size > kMaxInputLength)
+  return 0;
+```
 
 For out of tree [fuzz targets](glossary.md#fuzz-target), you will likely add options file using docker's
 `COPY` directive and will copy it into output in build script.
@@ -236,8 +306,9 @@ Dictionaries hugely improve fuzzing efficiency for inputs with lots of similar
 sequences of bytes. [libFuzzer documentation](http://libfuzzer.info#dictionaries)
 
 Put your dict file in `$OUT`. If the dict filename is the same as your target
-binary name (i.e. `%fuzz_target%.dict`), it will be automatically used. If the name is different
-(e.g. because it is shared by several targets), specify this in .options file:
+binary name (i.e. `%fuzz_target%.dict`), it will be automatically used. If the
+name is different (e.g. because it is shared by several targets), specify this
+in .options file:
 
 ```
 [libfuzzer]
@@ -259,7 +330,7 @@ if you are new to contributing via GitHub.
 Please include copyright headers for all files checked in to oss-fuzz:
 
 ```
-# Copyright 2016 Google Inc.
+# Copyright 2018 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
